@@ -76,69 +76,66 @@ int main(int argc, char *argv[])
 					// 清除颜色缓冲区
 					glClear(GL_COLOR_BUFFER_BIT);
 
-					for (i = 0; i < 40; i++)
+					// 距离警告
+					float w_distance = 100000;
+					std::string w_d = "Unknow";
+					std::string w_v_id = "Unknow";
+					std::string w_speed = "Unknow";
+					std::string warning = " ";
+
+					for (i = 0; i < 64; i++)
 					//for (int i = 1; i < 8; i = 1)
 					{	
 						// 获得玩家矩阵
 						ViewMatrix(aces_base, matrix);
 						// 本地玩家
 						int localplayer = 1;
+						Coord coord;
 						// 获取玩家数据
-						PlayerValues local_player = playerValues(aces_base, 0 ,localplayer);
+						PlayerValues local_player = playerValues(aces_base, 0 ,localplayer, coord);
+						coord.x = local_player.player_x;
+						coord.y = local_player.player_y;
+						coord.z = local_player.player_z;
 						// 获取玩家团队
 						//uint32_t player_team = local_player.team;
 						//std::cout << "PlayerTeam:" << player_team << std::endl;
 
 						//获取其他玩家数据
 						localplayer = 0;
-						PlayerValues player_data = playerValues(aces_base, i ,localplayer);
+						PlayerValues player_data = playerValues(aces_base, i ,localplayer, coord);
 						// 如果为敌方玩家
 						if(local_player.team != player_data.team && player_data.state ==0 && player_data.team != 0)
 						{
-							View origin =  WorldtoScreen(matrix, player_data, WINDOW_WIDTH, WINDOW_HEIGHT);
+							// 距离警告
+							if (player_data.distance < w_distance)
+							{
+								w_distance = player_data.distance;
+								w_d = player_data.string_distance;
+								w_v_id = player_data.vehicle_id;
+								w_speed = player_data.km_h;
+							}
+							warning = w_v_id + "[ " + w_d + " Km] " + "(" + w_speed + " km/h" + ")";
 
+							// 屏幕外坐标计算
+							View origin =  WorldtoScreen(matrix, player_data, WINDOW_WIDTH, WINDOW_HEIGHT);
 							View draw = DrawOverWatch(origin);
 							// 定义要显示的文字
 							std::string vehicle_id = player_data.vehicle_id;
 
-							//std::cout << "PlayerID:" << player_data.play_id << std::endl;
-							//std::cout << "VehicleID:" << vehicle_id << std::endl;
-							//std::cout << "X:" << player_data.player_x << " Y:" << player_data.player_y << " Z:" << player_data.player_x << std::endl;
-							//std::cout << "ScreenX:" << draw.draw_x << " ScreenY:" << draw.draw_y << std::endl;
-							// 计算距离
-							std::string distance;
-							float distanceF;
-							Distance(local_player, player_data, &distance, &distanceF);
-							//std::string distance = Distance(local_player, player_data);
-							//std::cout << "Distance:" << distance << std::endl;
+							//high
+							int int_high = int(player_data.player_y);
+							std::string high = std::to_string(int_high);
 
-							// 无敌判断
-							std::string protect;
-							std::ostringstream st;
-							st << std::fixed << std::setprecision(1) << player_data.super_time;
-							std::string super_time = st.str();
-							if (player_data.protect == 1)
-							{
-								protect = " Protect : " + super_time + " s";
-								//std::cout << "Protect:" << super_time << std::endl;
-							}
-							else{protect = " ";}
-
-							// 装填指示
-							std::string reload;
-							if (player_data.reload > 0)
-							{reload = std::to_string(player_data.reload/3);}
-							else
-							{reload = " ";}
 							// 拼接字符串
-							std::string enemy_info = vehicle_id + " [ " + distance + " Km] " + protect;
-							std::string overwatch = " [ " + distance + " Km] ";
+							std::string enemy_info = "[" + player_data.string_distance + "Km] " + "(" + player_data.km_h + " km/h" + ")";
+							std::string high_info = "< " + high + " M > ";
+							std::string overwatch = "[ " + player_data.string_distance + " Km] ";
 							// 设置文字位置
 							//int textX = draw.draw_x;
 							//int textY = (1080 - draw.draw_y);
 
 							// 设置文字颜色
-							Color text_color = color(distanceF, local_player.vehicle_type, player_data.vehicle_type);
+							Color text_color = color(player_data.distance/1000);
 							glColor3f(text_color.R, text_color.G, text_color.B);
 							// 设置文字大小
 							//int fontSize = 128;
@@ -162,27 +159,47 @@ int main(int argc, char *argv[])
 								glEnd();
 							}
 
-							// 绘制信息
-							glRasterPos2f(2.0f * point[0].draw_x / WINDOW_WIDTH - 1.0f, 
-										2.0f * (1080 - point[0].draw_y + 10) / WINDOW_HEIGHT - 1.0f);
-							for (char c : enemy_info) 
-							{
-								glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
-							}
 							// 绘制玩家ID
-							glRasterPos2f(2.0f * point[0].draw_x / WINDOW_WIDTH - 1.0f, 
-										2.0f * (1080 - point[0].draw_y + 35) / WINDOW_HEIGHT - 1.0f);
-							for (char c : player_data.play_id) 
-							{
-								glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
-							}
-							// 绘制装填时间
+							// 颜色
+							glColor3f(1, 0, 1);
 							glRasterPos2f(2.0f * (point[3].draw_x + 5) / WINDOW_WIDTH - 1.0f, 
 										2.0f * (1080 - point[3].draw_y) / WINDOW_HEIGHT - 1.0f);
-							for (char c : reload) 
+							for (char c : player_data.play_id) 
 							{
-								glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
+								glutBitmapCharacter(GLUT_BITMAP_9_BY_15, c);
 							}
+							// 绘制载具型号
+							// 颜色
+							glColor3f(0, 0, 0);
+							glRasterPos2f(2.0f * (point[3].draw_x + 5) / WINDOW_WIDTH - 1.0f, 
+										2.0f * (1080 - point[3].draw_y - 15) / WINDOW_HEIGHT - 1.0f);
+							for (char c : vehicle_id) 
+							{
+								glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, c);
+							}
+							// 颜色
+							glColor3f(text_color.R, text_color.G, text_color.B);
+							// 绘制信息
+							glRasterPos2f(2.0f * (point[3].draw_x + 5) / WINDOW_WIDTH - 1.0f, 
+										2.0f * (1080 - point[3].draw_y - 30) / WINDOW_HEIGHT - 1.0f);
+							for (char c : enemy_info) 
+							{
+								glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, c);
+							}
+							// 绘制high
+							glRasterPos2f(2.0f * (point[3].draw_x + 5) / WINDOW_WIDTH - 1.0f, 
+										2.0f * (1080 - point[3].draw_y - 45) / WINDOW_HEIGHT - 1.0f);
+							for (char c : high_info) 
+							{
+								glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, c);
+							}
+							// 绘制装填时间
+							// glRasterPos2f(2.0f * (point[3].draw_x + 5) / WINDOW_WIDTH - 1.0f, 
+							// 			2.0f * (1080 - point[3].draw_y) / WINDOW_HEIGHT - 1.0f);
+							// for (char c : reload) 
+							// {
+							// 	glutBitmapCharacter(GLUT_BITMAP_9_BY_15, c);
+							// }
 							// 超视野绘制
 							glRasterPos2f(2.0f * draw.draw_x / WINDOW_WIDTH - 1.0f, 
 										2.0f * (1080 - draw.draw_y) / WINDOW_HEIGHT - 1.0f);
@@ -202,6 +219,18 @@ int main(int argc, char *argv[])
 							//std::this_thread::sleep_for(std::chrono::seconds(1));
 						}
 					}
+					// 设置文字颜色
+					Color w_color = color(w_distance/1000);
+					glColor3f(w_color.R, w_color.G, w_color.B);
+
+					// 警告绘制
+					glRasterPos2f(2.0f * 600 / WINDOW_WIDTH - 1.0f, 
+								2.0f * (1080 - 70) / WINDOW_HEIGHT - 1.0f);
+					for (char c : warning) 
+					{
+						glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, c);
+					}
+
 					// 交换缓冲区
 					glfwSwapBuffers(window);
 					i = 0;

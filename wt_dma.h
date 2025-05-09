@@ -30,7 +30,7 @@ float matrix[16];
 const int WINDOW_WIDTH = 1920;
 const int WINDOW_HEIGHT = 1080;
 // 点尺寸
-const int POINT_SIZE = 6;
+const int POINT_SIZE = 1;
 
 // 玩家结构体
 struct PlayerValues
@@ -38,20 +38,22 @@ struct PlayerValues
 	std::string play_id = "Unknow";
 	std::string vehicle_id = "Unknow";
     std::string type = "Unknow";
+	std::string string_distance = "Unknow";
+	std::string km_h = "Unknow";
     int vehicle_type = 1;
-	uint32_t reload = 0;
 	uint32_t team = 0;
 	uint32_t state = 4;
-	uint32_t protect = 0;
+	// uint32_t protect = 0;
 	float player_x = 0;
 	float player_y = 0;
 	float player_z = 0;
 	float rotation[9];
 	float bbmin[3];
 	float bbmax[3];
+	float distance = 0;
+	double veloctity[3];
+	double speed = 0;
 	//float bbcenter[3];
-
-	float super_time = 0;//无敌时间
 };
 // 屏幕坐标结构体
 struct View
@@ -87,6 +89,13 @@ struct Type
     std::string type_3 = "exp_fighter";
     std::string type_4 = "exp_SPAA";
     std::string type_5 = "exp_helicopter";
+};
+// 坐标结构体
+struct Coord
+{
+	float x = 0;
+	float y = 0;
+	float z = 0;
 };
 
 bool active = true;
@@ -160,51 +169,46 @@ std::string vehicleName(uint64_t vehicleID)
 	return newString;
 }
 
-// 载具类型判断
-int playerVehicleType(std::string vehicle_type)
+// 距离计算
+void Distance(float x, float y, float z,Coord coord, std::string* result, float* distance)
 {
-    Type type;
-    if(vehicle_type == type.type_1)
-    {
-        return 2;
-    }
-    else if(vehicle_type == type.type_2)
-    {
-        return 2;
-    }
-    else if(vehicle_type == type.type_3)
-    {
-        return 2;
-    }
-    else if(vehicle_type == type.type_4)
-    {
-        return 3;
-    }
-    else if(vehicle_type == type.type_5)
-    {
-        return 4;
-    }
-    else
-    {
-        return 1;
-    }
+	*distance = std::sqrt(std::pow(coord.x - x, 2) + 
+		std::pow(coord.y - y, 2) + std::pow(coord.z - z, 2));
+	
+	// 距离换算为Km
+	float d = *distance / 1000.0;
+	std::ostringstream dis;
+    dis << std::fixed << std::setprecision(2) << d;
+	// 距离字符串result
+    *result = dis.str();
+}
+
+// 速度计算
+void Veloctity(double* veloctity,std::string* km_h, double* speed)
+{
+	*speed = std::sqrt(std::pow(veloctity[0], 2) + 
+		std::pow(veloctity[1], 2) + std::pow(veloctity[2], 2));
+	
+	// 距离换算为Km
+	double v = *speed * 3.6;
+	std::ostringstream dis;
+    dis << std::fixed << std::setprecision(0) << v;
+	// 距离字符串result
+    *km_h = dis.str();
 }
 
 // 遍历玩家数据
-PlayerValues playerValues(uint64_t aces, int number, int localplayer)
+PlayerValues playerValues(uint64_t aces, int number, int localplayer, Coord coord)
 {
 	PlayerValues data;
 	uint64_t playerData;
     uint64_t vehicle_data;
 	uint64_t vehicleID;
     uint64_t vehicleType;
+	uint64_t planeInfor;
 	// 进入玩家列表
 	//wt_mem.ReadData<long int>(offset_wt::dwLocalPlayer + aces_base, localplayer_wt_1);
-	//wt_mem.ReadData<uint64_t>(offset::OFFSET_START + aces + offset::LOCAL_PLAYER, playerData);
-	//printf("[Info]localplayer Out Base: %lp\n", playerData);
-	//如果索引值小于0，则取绝对值
-	//playerData = abs(playerData);
-
+	
 	//进入本地玩家列表或者全部实体列表
 	if(localplayer == 1)
 	{
@@ -225,7 +229,6 @@ PlayerValues playerValues(uint64_t aces, int number, int localplayer)
 	}
 	//wt_mem.ReadData<uint64_t>(playerData, playerData);
 	//printf("[Info]localplayer In Base: %lp\n", playerData);
-
 	// 玩家ID
 	//wt_mem.ReadData<long int>(playerData + offset::PLAYER_ID, playerID);
 	data.play_id = playerName(playerData);
@@ -244,10 +247,13 @@ PlayerValues playerValues(uint64_t aces, int number, int localplayer)
     //std::cout << "vehicleID: " << std::hex <<  vehicleID << std::endl;
 	data.vehicle_id = vehicleName(vehicleID);
     // 载具类型
-    wt_mem.ReadData<uint64_t>(vehicle_data + offset::VEHICLE_TYPE, vehicleType);
-	data.type = vehicleName(vehicleType);
-    data.vehicle_type = playerVehicleType(data.type);
+    // wt_mem.ReadData<uint64_t>(vehicle_data + offset::VEHICLE_TYPE, vehicleType);
+	// data.type = vehicleName(vehicleType);
+    // data.vehicle_type = playerVehicleType(data.type);
     //std::cout << "vehicleType: " << data.type << std::endl;
+
+	// 空中载具信息
+	wt_mem.ReadData<uint64_t>(playerData + offset::PLANE, planeInfor);
 
 	// 玩家单位旋转矩阵
 	uint32_t float_data;
@@ -279,6 +285,19 @@ PlayerValues playerValues(uint64_t aces, int number, int localplayer)
 		data.bbmax[i] = value;
 	}
 
+	// 玩家速度
+	uint64_t double_data;
+	for (int i = 0; i < 3; i++)
+	{
+		wt_mem.ReadData<uint64_t>(planeInfor + offset::PLANE_VELOCITY + (offset::LOCATION_OFFSET * i * 2), double_data);
+		double* data_p1 = reinterpret_cast<double*>(&double_data);
+		double value1 = *data_p1;
+		//std::cout << value << std::endl;
+		data.veloctity[i] = value1;
+	}
+	Veloctity(data.veloctity, &data.km_h, &data.speed);
+
+
 	// 玩家坐标
 	uint32_t x, z, y;
 	wt_mem.ReadFloat<uint32_t>(playerData + offset::LOCATION, x);
@@ -294,36 +313,30 @@ PlayerValues playerValues(uint64_t aces, int number, int localplayer)
 
 	uint32_t hex8 = 0;
 
-	// 装填状态
-	wt_mem.ReadFloat<uint32_t>(playerData + offset::RELOAD, hex8);
-	// 将team转换为一个指向字节的指针
-    uint8_t* bytePtr = reinterpret_cast<uint8_t*>(&hex8);
-    // 提取最前端的一个字节
-    uint8_t frontByte = *bytePtr;
-    // 输出提取的字节的十六进制表示
-    data.reload = frontByte;
-
-	// 无敌时间
-	wt_mem.ReadFloat<uint32_t>(playerData + offset::SUPER_TIME, float_data);
-	// 重解释转换
-	float* st = reinterpret_cast<float*>(&float_data);
-	data.super_time = *st;
+	// // 装填状态
+	// wt_mem.ReadFloat<uint32_t>(playerData + offset::RELOAD, hex8);
+	// // 将team转换为一个指向字节的指针
+    // uint8_t* bytePtr = reinterpret_cast<uint8_t*>(&hex8);
+    // // 提取最前端的一个字节
+    // uint8_t frontByte = *bytePtr;
+    // // 输出提取的字节的十六进制表示
+    // data.reload = frontByte;
 
 	// 无敌状态
-	wt_mem.ReadFloat<uint32_t>(playerData + offset::PROTECT, hex8);
-	// 将team转换为一个指向字节的指针
-    bytePtr = reinterpret_cast<uint8_t*>(&hex8);
-    // 提取最前端的一个字节
-    frontByte = *bytePtr;
-    // 输出提取的字节的十六进制表示
-    data.protect = frontByte;
+	// wt_mem.ReadFloat<uint32_t>(playerData + offset::PROTECT, hex8);
+	// // 将team转换为一个指向字节的指针
+    // uint8_t* bytePtr = reinterpret_cast<uint8_t*>(&hex8);
+    // // 提取最前端的一个字节
+    // uint8_t frontByte = *bytePtr;
+    // // 输出提取的字节的十六进制表示
+    // data.protect = frontByte;
 
 	// 玩家状态
 	wt_mem.ReadFloat<uint32_t>(playerData + offset::PLAYER_STATE, hex8);
 	// 将team转换为一个指向字节的指针
-    bytePtr = reinterpret_cast<uint8_t*>(&hex8);
+    uint8_t* bytePtr = reinterpret_cast<uint8_t*>(&hex8);
     // 提取最前端的一个字节
-    frontByte = *bytePtr;
+    uint8_t frontByte = *bytePtr;
     // 输出提取的字节的十六进制表示
     data.state = frontByte;
 
@@ -335,6 +348,10 @@ PlayerValues playerValues(uint64_t aces, int number, int localplayer)
     frontByte = *bytePtr;
     // 输出提取的字节的十六进制表示
     data.team = frontByte;
+
+	//距离计算
+	Distance(data.player_x, data.player_y, data.player_z, coord, 
+				&data.string_distance, &data.distance);
 
 	return data;
 }
@@ -381,95 +398,45 @@ View WorldtoScreen(float* matrix, PlayerValues player, int screen_length, int sc
 	return out;
 }
 
-// 距离计算
-void Distance(PlayerValues player, PlayerValues enemy,std::string* result, float* distance)
-{
-	*distance = std::sqrt(std::pow(enemy.player_x - player.player_x, 2) + 
-		std::pow(enemy.player_y - player.player_y, 2) + std::pow(enemy.player_z - player.player_z, 2));
-	
-	// 距离换算为Km
-	*distance /= 1000.0;
-	std::ostringstream dis;
-    dis << std::fixed << std::setprecision(2) << *distance;
-	// 距离字符串result
-    *result = dis.str();
-}
-
 // 颜色判断
-Color color(float distance, int player_type, int enemy_type)
+Color color(float distance)
 {
-    // 2 飞机
-    // 3 AA
-    // 4 直升机
-    // 1 Tank
     Color draw;
-    // 如果玩家plane，敌方plane || helicopter，敌方plane
-    if((player_type == 2 && enemy_type == 2) || (player_type == 4 && enemy_type == 2))
+    if(distance <= 5.0f)
 	{
-        // 黄色（Yellow）：(1, 1, 0)
-        draw.R = 1.0f;
-		draw.G = 1.0f;
-		draw.B = 0.0f;
-    }
-    // 如果玩家AA，敌方plane || 玩家helicopter，敌方tank || 玩家plane，敌方tank || 玩家tank，敌方plane
-    else if((player_type == 3 && enemy_type == 2) || 
-            (player_type == 4 && enemy_type == 1) ||
-            (player_type == 2 && enemy_type == 1) ||
-            (player_type == 1 && enemy_type == 2))
+	// 红色（Red）：(1, 0, 0)
+	draw.R = 1.0f;
+	draw.G = 0.0f;
+	draw.B = 0.0f;
+	}
+	else if(5.0f < distance && distance <= 10.0f)
 	{
-        // 青色（Cyan）：(0, 1, 1)
-        draw.R = 0.0f;
-		draw.G = 1.0f;
-		draw.B = 1.0f;
-    }
-    // 如果玩家AA，敌方helicopter || 玩家helicopter，敌方AA || plane，敌方AA
-    else if((player_type == 3 && enemy_type == 4) || 
-        	(player_type == 4 && enemy_type == 3) || 
-        	(player_type == 2 && enemy_type == 3))
+	// 黄色（Yellow）：(1, 1, 0)
+	draw.R = 1.0f;
+	draw.G = (distance - 5.0)/3;
+	draw.B = 0.0f;
+	}
+	else if(10.0f < distance && distance <= 15.0f)
 	{
-        // 红色（Red）：(1, 0, 0)
-        draw.R = 1.0f;
-		draw.G = 0.0f;
-		draw.B = 0.0f;
-    }
-    else
-    {
-        if(distance <= 0.1f)
-		{
-		// 红色（Red）：(1, 0, 0)
-		draw.R = 1.0f;
-		draw.G = 0.0f;
-		draw.B = 0.0f;
-		}
-		else if(0.1f < distance && distance <= 2.0f)
-		{
-		// 黄色（Yellow）：(1, 1, 0)
-		draw.R = 1.0f;
-		draw.G = distance/2;
-		draw.B = 0.0f;
-		}
-		else if(2.0f < distance && distance <= 4.0f)
-		{
-		// 绿色（Green）：(0, 1, 0)
-		draw.R = (4.0f - distance)/2;
-		draw.G = 1.0f;
-		draw.B = 0.0f;
-		}
-		else if(4.0f < distance && distance <= 6.0f)
-		{
-		// 青色（Cyan）：(0, 1, 1)
-		draw.R = 0.0f;
-		draw.G = 1.0f;
-		draw.B = (distance - 4.0f)/2;
-		}
-		else
-		{
-		// 青色（Cyan）：(0, 1, 1)
-		draw.R = 0.0f;
-		draw.G = 1.0f;
-		draw.B = 1.0f;
-		}
-    }
+	// 绿色（Green）：(0, 1, 0)
+	draw.R = (15.0f - distance)/3;
+	draw.G = 1.0f;
+	draw.B = 0.0f;
+	}
+	else if(15.0f < distance && distance <= 20.0f)
+	{
+	// 青色（Cyan）：(0, 1, 1)
+	draw.R = 0.0f;
+	draw.G = 1.0f;
+	draw.B = (distance - 15.0f)/3;
+	}
+	else
+	{
+	// 青色（Cyan）：(0, 1, 1)
+	draw.R = 0.0f;
+	draw.G = 1.0f;
+	draw.B = 1.0f;
+	}
     /*
 	红色（Red）：(1, 0, 0)
 	绿色（Green）：(0, 1, 0)

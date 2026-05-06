@@ -13,7 +13,7 @@
 
 # 以下是部署教程  
 
-针对基于Ubuntu系统搭建显卡直通的KVM虚拟机进行内存分析.md
+[针对基于Ubuntu系统搭建显卡直通的KVM虚拟机进行内存分析.md](https://github.com/GlaringMarvel/WarThunder-KVM-Tools/blob/b9ceee7ec7e47d363cb5bf781918b2fbb3f2de26/%E9%92%88%E5%AF%B9%E5%9F%BA%E4%BA%8EUbuntu%E7%B3%BB%E7%BB%9F%E6%90%AD%E5%BB%BA%E6%98%BE%E5%8D%A1%E7%9B%B4%E9%80%9A%E7%9A%84KVM%E8%99%9A%E6%8B%9F%E6%9C%BA%E8%BF%9B%E8%A1%8C%E5%86%85%E5%AD%98%E5%88%86%E6%9E%90.md)
 
 # 注意！！！请在试图阅读我的代码之前准备好降压药物！！！
 这是我的第一个完整的C++作品，算是初学作品，大概写于22年左右。在重构时我自己都懒得喷了，写的一坨。
